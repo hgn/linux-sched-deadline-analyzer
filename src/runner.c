@@ -1,75 +1,244 @@
+#define _GNU_SOURCE
+#include <sched.h>
+#include <getopt.h>
+#include <stdbool.h>
+#include <sys/time.h>
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <linux/unistd.h>
+#include <linux/kernel.h>
+#include <linux/types.h>
+#include <sys/syscall.h>
+#include <pthread.h>
 
-struct args {
-	unsigned cpu_iterations;
-	unsigned sleep_time_ms;
+#define gettid() syscall(__NR_gettid)
 
-	unsigned deadline_runtime;
-	unsigned deadline_period;
-	// unsigned is not correct, simple
-	// use all original values for setting
-	// the deadline scheduler via setsched...()
+#define SCHED_DEADLINE       6
+
+/* XXX use the proper syscall numbers */
+#ifdef __x86_64__
+#define __NR_sched_setattr           314
+#define __NR_sched_getattr           315
+#endif
+
+#ifdef __i386__
+#define __NR_sched_setattr           351
+#define __NR_sched_getattr           352
+#endif
+
+#ifdef __arm__
+#define __NR_sched_setattr           380
+#define __NR_sched_getattr           381
+#endif
+
+struct sched_attr {
+     __u32 size;
+
+     __u32 sched_policy;
+     __u64 sched_flags;
+
+     /* SCHED_NORMAL, SCHED_BATCH */
+     __s32 sched_nice;
+
+     /* SCHED_FIFO, SCHED_RR */
+     __u32 sched_priority;
+
+     /* SCHED_DEADLINE (nsec) */
+     __u64 sched_runtime;
+     __u64 sched_deadline;
+     __u64 sched_period;
 };
 
-void parse_args(struct args *args)
+
+struct config {
+	struct sched_attr attr;
+	unsigned long long cpu_iterations, program_iterations;
+	unsigned sleeptime_ms;
+};
+
+
+int sched_setattr(pid_t pid,
+               const struct sched_attr *attr,
+               unsigned int flags)
 {
-	if (0) {
-		fprintf(stderr, "arguments wrong somehow, exiting");
+	printf("Periode: %llu, Runtime: %llu, Deadline: %llu\n",
+			attr->sched_period, attr->sched_runtime, attr->sched_deadline);
+
+	return syscall(__NR_sched_setattr, pid, attr, flags);
+}
+
+
+int sched_getattr(pid_t pid,
+               struct sched_attr *attr,
+               unsigned int size,
+               unsigned int flags)
+{
+	return syscall(__NR_sched_getattr, pid, attr, size, flags);
+}
+
+
+void print_help(void)
+{
+	printf("runner [options]\n\
+			-i <number> number of CPU iterations\n\
+			-I <number> number of program loop iterations. Used to prevent\n\t\
+			the program running forever and potentially freezing your system.\n\
+			-s <number> sleep time in milliseconds\n\
+			-r <number> runtime in milliseconds (time slice)\n\
+			-p <number> deadline in milliseconds\n");
+}
+
+
+void parse_args(struct config *cfg, int argc, char *argv[])
+{
+	int opt;
+	while ((opt = getopt(argc, argv, "i:I:s:r:p:d:")) != -1) {
+		switch (opt) {
+		case 'i':
+			cfg->cpu_iterations = (unsigned long long)atoll(optarg);
+			break;
+		case 'I':
+			cfg->program_iterations = (unsigned)atoi(optarg);
+			break;
+		case 's':
+			cfg->sleeptime_ms = (unsigned)atoi(optarg);
+			printf("sleeptime konfiguriert: %u\n", cfg->sleeptime_ms);
+			break;
+		/* scheduler times are ns, user gives ms */
+		case 'r':
+			cfg->attr.sched_runtime = 1000*1000*atoi(optarg);
+			break;
+		case 'd':
+			cfg->attr.sched_deadline = 1000*1000*atoi(optarg);
+			break;
+		case 'p':
+			cfg->attr.sched_period = 1000*1000*atoi(optarg);
+			break;
+		default:
+			fprintf(stderr, "arguments wrong somehow, exiting...\n");
+			print_help();
+			exit(EXIT_FAILURE);
+			break;
+		}
+	}
+}
+
+
+void configure_cpu()
+{
+	cpu_set_t set;
+	CPU_ZERO(&set);
+	CPU_SET(0, &set);
+	if (sched_setaffinity(0, sizeof(set), &set) == -1) {
+		perror("configure_cpu");
+		exit(EXIT_FAILURE);
+	}
+	puts("Successfully set to cpu 0.");
+}
+
+
+void init_program(struct config *cfg)
+{
+	/* configure_cpu(); */
+
+	int ret = sched_setattr(0, &(cfg->attr), 0);
+	if (ret < 0) {
+		perror("sched_setattr");
 		exit(EXIT_FAILURE);
 	}
 }
 
-void init_program(struct args *args)
+
+unsigned us_timediff(struct timeval tv_start, struct timeval tv_end)
 {
-	// if uid != 0, print error and help screen and
-	// exit now (we need root for this shit)
+	unsigned diff=0, sudiff=0;
+	time_t start, end;
+	suseconds_t sustart, suend;
+	start = tv_start.tv_sec;
+	end = tv_end.tv_sec;
+	sustart = tv_start.tv_usec;
+	suend = tv_end.tv_usec;
 
-	// bind program to cpu 0
+	/* printf("ende: %li\n", end); */
+	/* printf("start: %li\n", start); */
+	/* printf("suende: %li\n", suend); */
+	/* printf("sustart: %li\n", sustart); */
 
-	// if args.deadline, set scheduler policy here or
-	// in a seperate function
+	diff = end-start;
+	/* printf("End - Start in s: %u\n", diff); */
+	sudiff = suend-sustart;
+	/* printf("Rest End - Start in us: %u\n", sudiff); */
+
+	return diff * 1*1000*1000 + sudiff;
 }
 
-void busy_cycles(&args)
+
+void busy_cycles(struct config *cfg)
 {
-	int i = args->cpu_iterations;
+	unsigned long long i = cfg->cpu_iterations;
+	struct timeval tv_start, tv_end;
 
-	// pseudocode
-	gettimeofday(&start)
+	gettimeofday(&tv_start, NULL);
 
-	while (i--)
-		;
+	while (i--);
 
-	// pseudocode
-	gettimeofday(&end);
-
-	print("%u us runtime time", end - start);
+	gettimeofday(&tv_end, NULL);
+	printf("%u us run-time\n", us_timediff(tv_start, tv_end));
 }
 
-void xsleep(struct args *args)
+
+void xsleep(struct config *cfg)
 {
-	// pseudocode
-	gettimeofday(&start)
+	struct timeval tv_start, tv_end;
+	gettimeofday(&tv_start, NULL);
 
-	usleep(args->sleep_time_ms);
+	/* printf("Schlafe %u us...\n", cfg->sleeptime_ms); */
+	usleep(cfg->sleeptime_ms * 1000);
 
-	// pseudocode
-	gettimeofday(&end);
+	gettimeofday(&tv_end, NULL);
 
-	print("%u us sleep time", end - start);
+	printf("%u us sleep time\n", us_timediff(tv_start, tv_end));
 }
 
-int main(int argc, char **argv)
+
+int main(int argc, char *argv[])
 {
-	int ret;
-	struct args args;
+	unsigned i;
+	bool run = true;
 
-	parse_args(&args, argc, argv);
-	init_program(&args);
+	struct sched_attr attr = {
+		.size = sizeof(struct sched_attr),
+		.sched_flags = 0,
+		.sched_nice = 0,
+		.sched_priority = 0,
+		.sched_policy = SCHED_DEADLINE,
+		.sched_runtime = 10*1000*1000,
+		.sched_period = 600*1000*1000,
+		.sched_deadline = 500*1000*1000,
+	};
 
-	while (1) {
-		busy_cycles(&args);
-		xsleep(&args);
+	struct config cfg = {
+		.attr = attr,
+		.cpu_iterations = 1*1000*1000,
+		.program_iterations = 1,
+		.sleeptime_ms = 1000,
+	};
+
+	parse_args(&cfg, argc, argv);
+	init_program(&cfg);
+
+	for (i=0; run; i++) {
+		busy_cycles(&cfg);
+		xsleep(&cfg);
+
+		if (cfg.program_iterations != 0 && i == cfg.program_iterations)
+			run = false;
 	}
+
+	return EXIT_SUCCESS;
 }
+
+
