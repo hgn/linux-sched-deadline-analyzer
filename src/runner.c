@@ -109,13 +109,13 @@ void parse_args(struct config *cfg, int argc, char *argv[])
 			break;
 		/* scheduler times are ns, user gives ms */
 		case 'r':
-			cfg->attr.sched_runtime = 1000*1000*atoi(optarg);
+			cfg->attr.sched_runtime = 1000 * 1000 * atoi(optarg);
 			break;
 		case 'd':
-			cfg->attr.sched_deadline = 1000*1000*atoi(optarg);
+			cfg->attr.sched_deadline = 1000 * 1000 * atoi(optarg);
 			break;
 		case 'p':
-			cfg->attr.sched_period = 1000*1000*atoi(optarg);
+			cfg->attr.sched_period = 1000 * 1000 * atoi(optarg);
 			break;
 		default:
 			fprintf(stderr, "arguments wrong somehow, exiting...\n");
@@ -142,7 +142,7 @@ void configure_cpu()
 
 void init_program(struct config *cfg)
 {
-	/* configure_cpu(); */
+	configure_cpu(); 
 
 	int ret = sched_setattr(0, &(cfg->attr), 0);
 	if (ret < 0) {
@@ -215,14 +215,14 @@ int main(int argc, char *argv[])
 		.sched_nice = 0,
 		.sched_priority = 0,
 		.sched_policy = SCHED_DEADLINE,
-		.sched_runtime = 10*1000*1000,
-		.sched_period = 600*1000*1000,
-		.sched_deadline = 500*1000*1000,
+		.sched_runtime  = 10  * 1000 * 1000,
+		.sched_period   = 600 * 1000 * 1000,
+		.sched_deadline = 500 * 1000 * 1000,
 	};
 
 	struct config cfg = {
 		.attr = attr,
-		.cpu_iterations = 1*1000*1000,
+		.cpu_iterations = 1 * 1000 * 1000,
 		.program_iterations = 1,
 		.sleeptime_ms = 1000,
 	};
@@ -240,5 +240,3 @@ int main(int argc, char *argv[])
 
 	return EXIT_SUCCESS;
 }
-
-
