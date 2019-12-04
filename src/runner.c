@@ -18,6 +18,8 @@
 
 #define SCHED_DEADLINE       6
 
+#define MILLION (1ULL * 1000 * 1000)
+
 /* XXX use the proper syscall numbers */
 #ifdef __x86_64__
 #define __NR_sched_setattr           314
@@ -109,13 +111,13 @@ void parse_args(struct config *cfg, int argc, char *argv[])
 			break;
 		/* scheduler times are ns, user gives ms */
 		case 'r':
-			cfg->attr.sched_runtime = 1000 * 1000 * atoi(optarg);
+			cfg->attr.sched_runtime = MILLION * atoi(optarg);
 			break;
 		case 'd':
-			cfg->attr.sched_deadline = 1000 * 1000 * atoi(optarg);
+			cfg->attr.sched_deadline = MILLION * atoi(optarg);
 			break;
 		case 'p':
-			cfg->attr.sched_period = 1000 * 1000 * atoi(optarg);
+			cfg->attr.sched_period = MILLION * atoi(optarg);
 			break;
 		default:
 			fprintf(stderr, "arguments wrong somehow, exiting...\n");
@@ -167,12 +169,12 @@ unsigned us_timediff(struct timeval tv_start, struct timeval tv_end)
 	/* printf("suende: %li\n", suend); */
 	/* printf("sustart: %li\n", sustart); */
 
-	diff = end-start;
+	diff = end - start;
 	/* printf("End - Start in s: %u\n", diff); */
-	sudiff = suend-sustart;
+	sudiff = suend - sustart;
 	/* printf("Rest End - Start in us: %u\n", sudiff); */
 
-	return diff * 1*1000*1000 + sudiff;
+	return diff * MILLION + sudiff;
 }
 
 
@@ -215,14 +217,14 @@ int main(int argc, char *argv[])
 		.sched_nice = 0,
 		.sched_priority = 0,
 		.sched_policy = SCHED_DEADLINE,
-		.sched_runtime  = 10  * 1000 * 1000,
-		.sched_period   = 600 * 1000 * 1000,
-		.sched_deadline = 500 * 1000 * 1000,
+		.sched_runtime  = 10  * MILLION,
+		.sched_period   = 600 * MILLION,
+		.sched_deadline = 500 * MILLION,
 	};
 
 	struct config cfg = {
 		.attr = attr,
-		.cpu_iterations = 1 * 1000 * 1000,
+		.cpu_iterations = 1 * MILLION,
 		.program_iterations = 1,
 		.sleeptime_ms = 1000,
 	};
