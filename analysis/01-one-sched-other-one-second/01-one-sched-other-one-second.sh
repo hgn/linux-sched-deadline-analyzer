@@ -11,7 +11,7 @@
 # This analyzer scripts are used by the other scripts, this is
 # just an simple example to get things done.
 
-../src/runner ... &
+../src/runner -i 1000000 -I 0 -s 100 -r 100 -d 200 -p 1000 &
 PID1=$!
 
 perf record -p $PID1
