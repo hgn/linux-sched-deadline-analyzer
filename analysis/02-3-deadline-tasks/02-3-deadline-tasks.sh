@@ -4,6 +4,8 @@
 # 3 deadline scheduler processes and a busy SCHED_OTHER
 # process
 
+sh ../configure-cpu-set.sh
+
 cpu_iter=1000000
 
 ./src/runner -i cpu_iter -I 0 -s 200 -r 100 -d 150 -p 1000  &

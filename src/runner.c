@@ -63,9 +63,7 @@ struct config {
 };
 
 
-int sched_setattr(pid_t pid,
-               const struct sched_attr *attr,
-               unsigned int flags)
+int sched_setattr(pid_t pid, const struct sched_attr *attr, unsigned int flags)
 {
 	printf("Periode: %llu, Runtime: %llu, Deadline: %llu\n",
 			attr->sched_period, attr->sched_runtime, attr->sched_deadline);
@@ -74,10 +72,8 @@ int sched_setattr(pid_t pid,
 }
 
 
-int sched_getattr(pid_t pid,
-               struct sched_attr *attr,
-               unsigned int size,
-               unsigned int flags)
+int sched_getattr(pid_t pid, struct sched_attr *attr, unsigned int size,
+		unsigned int flags)
 {
 	return syscall(__NR_sched_getattr, pid, attr, size, flags);
 }
@@ -85,7 +81,7 @@ int sched_getattr(pid_t pid,
 
 void print_help(void)
 {
-	printf("runner [options]\tAll times in milliseconds\n
+	printf("runner [options]\tAll times in milliseconds\n\
 			-i <number> number of CPU iterations\n\
 			-I <number> number of program loop iterations. Used to prevent\n\t\
 			the program running forever and potentially freezing your system.\n\t\
@@ -110,17 +106,16 @@ void parse_args(struct config *cfg, int argc, char *argv[])
 			break;
 		case 's':
 			cfg->sleeptime_ms = (unsigned)atoi(optarg);
-			printf("sleeptime konfiguriert: %u\n", cfg->sleeptime_ms);
 			break;
 		/* scheduler times are ns, user gives ms */
 		case 'r':
-			cfg->attr.sched_runtime = MS_TO_NS_FACTOR * atoi(optarg);
+			cfg->attr.sched_runtime = (__u64)(MS_TO_NS_FACTOR * atoi(optarg));
 			break;
 		case 'd':
-			cfg->attr.sched_deadline = MS_TO_NS_FACTOR * atoi(optarg);
+			cfg->attr.sched_deadline = (__u64)(MS_TO_NS_FACTOR * atoi(optarg));
 			break;
 		case 'p':
-			cfg->attr.sched_period = MS_TO_NS_FACTOR * atoi(optarg);
+			cfg->attr.sched_period = (__u64)(MS_TO_NS_FACTOR * atoi(optarg));
 			break;
 		default:
 			fprintf(stderr, "arguments wrong somehow, exiting...\n");
@@ -236,10 +231,12 @@ int main(int argc, char *argv[])
 
 	parse_args(&cfg, argc, argv);
 
-	if (attr.sched_runtime > 0 && attr.sched_period > 0 && attr.sched_deadline > 0)
+	if (cfg.attr.sched_runtime > 0 && cfg.attr.sched_period > 0 &&
+			cfg.attr.sched_deadline > 0) {
 		init_sched_dead(&cfg);
+	}
 
-	for (i=0; run; i++) {
+	for (i = 0; run; i++) {
 		busy_cycles(&cfg);
 		xsleep(&cfg);
 
