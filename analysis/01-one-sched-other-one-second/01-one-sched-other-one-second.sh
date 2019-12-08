@@ -14,10 +14,8 @@ sh ../configure-cpu-set.sh
 ../../src/runner -i 1000000 -I 0 -s 100 -r 100 -d 200 -p 1000 &
 PID1=$!
 
-perf record -p $PID1
-PID_PERF=$!
+perf record -p $PID1 &
 
-sleep 10
+sleep 1
 
-kill $PID1
-kill $PID_PERF
+kill -9 $PID1
