@@ -18,6 +18,9 @@
 
 #define SCHED_DEADLINE       6
 
+#define MS_TO_NS_FACTOR (1ULL * 1000 * 1000)
+#define S_TO_US_FACTOR (1ULL * 1000 * 1000)
+
 /* XXX use the proper syscall numbers */
 #ifdef __x86_64__
 #define __NR_sched_setattr           314
@@ -60,9 +63,7 @@ struct config {
 };
 
 
-int sched_setattr(pid_t pid,
-               const struct sched_attr *attr,
-               unsigned int flags)
+int sched_setattr(pid_t pid, const struct sched_attr *attr, unsigned int flags)
 {
 	printf("Periode: %llu, Runtime: %llu, Deadline: %llu\n",
 			attr->sched_period, attr->sched_runtime, attr->sched_deadline);
@@ -71,10 +72,8 @@ int sched_setattr(pid_t pid,
 }
 
 
-int sched_getattr(pid_t pid,
-               struct sched_attr *attr,
-               unsigned int size,
-               unsigned int flags)
+int sched_getattr(pid_t pid, struct sched_attr *attr, unsigned int size,
+		unsigned int flags)
 {
 	return syscall(__NR_sched_getattr, pid, attr, size, flags);
 }
@@ -82,13 +81,15 @@ int sched_getattr(pid_t pid,
 
 void print_help(void)
 {
-	printf("runner [options]\n\
+	printf("runner [options]\tAll times in milliseconds\n\
 			-i <number> number of CPU iterations\n\
 			-I <number> number of program loop iterations. Used to prevent\n\t\
-			the program running forever and potentially freezing your system.\n\
-			-s <number> sleep time in milliseconds\n\
-			-r <number> runtime in milliseconds (time slice)\n\
-			-p <number> deadline in milliseconds\n");
+			the program running forever and potentially freezing your system.\n\t\
+			set to 0 to run forever.\n\
+			-s <number> sleep-time for xsleep\n\
+			-p <number> period for sched_dead\n\
+			-r <number> run-time for sched_dead\n\
+			-d <number> deadline for sched_dead\n");
 }
 
 
@@ -105,17 +106,16 @@ void parse_args(struct config *cfg, int argc, char *argv[])
 			break;
 		case 's':
 			cfg->sleeptime_ms = (unsigned)atoi(optarg);
-			printf("sleeptime konfiguriert: %u\n", cfg->sleeptime_ms);
 			break;
 		/* scheduler times are ns, user gives ms */
 		case 'r':
-			cfg->attr.sched_runtime = 1000*1000*atoi(optarg);
+			cfg->attr.sched_runtime = (__u64)(MS_TO_NS_FACTOR * atoi(optarg));
 			break;
 		case 'd':
-			cfg->attr.sched_deadline = 1000*1000*atoi(optarg);
+			cfg->attr.sched_deadline = (__u64)(MS_TO_NS_FACTOR * atoi(optarg));
 			break;
 		case 'p':
-			cfg->attr.sched_period = 1000*1000*atoi(optarg);
+			cfg->attr.sched_period = (__u64)(MS_TO_NS_FACTOR * atoi(optarg));
 			break;
 		default:
 			fprintf(stderr, "arguments wrong somehow, exiting...\n");
@@ -127,6 +127,7 @@ void parse_args(struct config *cfg, int argc, char *argv[])
 }
 
 
+/* currently unused. setaffinity does not work with sched_dead */
 void configure_cpu()
 {
 	cpu_set_t set;
@@ -140,10 +141,8 @@ void configure_cpu()
 }
 
 
-void init_program(struct config *cfg)
+void init_sched_dead(struct config *cfg)
 {
-	/* configure_cpu(); */
-
 	int ret = sched_setattr(0, &(cfg->attr), 0);
 	if (ret < 0) {
 		perror("sched_setattr");
@@ -162,17 +161,19 @@ unsigned us_timediff(struct timeval tv_start, struct timeval tv_end)
 	sustart = tv_start.tv_usec;
 	suend = tv_end.tv_usec;
 
-	/* printf("ende: %li\n", end); */
-	/* printf("start: %li\n", start); */
-	/* printf("suende: %li\n", suend); */
-	/* printf("sustart: %li\n", sustart); */
+	/*
+	 printf("ende: %li\n", end); 
+	 printf("start: %li\n", start); 
+	 printf("suende: %li\n", suend); 
+	 printf("sustart: %li\n", sustart); 
+	*/
 
-	diff = end-start;
+	diff = end - start;
 	/* printf("End - Start in s: %u\n", diff); */
-	sudiff = suend-sustart;
+	sudiff = suend - sustart;
 	/* printf("Rest End - Start in us: %u\n", sudiff); */
 
-	return diff * 1*1000*1000 + sudiff;
+	return diff * S_TO_US_FACTOR + sudiff;
 }
 
 
@@ -195,7 +196,7 @@ void xsleep(struct config *cfg)
 	struct timeval tv_start, tv_end;
 	gettimeofday(&tv_start, NULL);
 
-	/* printf("Schlafe %u us...\n", cfg->sleeptime_ms); */
+	/* printf("Sleeping %u us...\n", cfg->sleeptime_ms); */
 	usleep(cfg->sleeptime_ms * 1000);
 
 	gettimeofday(&tv_end, NULL);
@@ -215,30 +216,34 @@ int main(int argc, char *argv[])
 		.sched_nice = 0,
 		.sched_priority = 0,
 		.sched_policy = SCHED_DEADLINE,
-		.sched_runtime = 10*1000*1000,
-		.sched_period = 600*1000*1000,
-		.sched_deadline = 500*1000*1000,
+		/* init to 0, to detect if sched_dead is on or off */
+		.sched_runtime  = 0, 
+		.sched_period   = 0,
+		.sched_deadline = 0,
 	};
 
 	struct config cfg = {
 		.attr = attr,
-		.cpu_iterations = 1*1000*1000,
+		.cpu_iterations = 1 * 1000 * 1000,
 		.program_iterations = 1,
 		.sleeptime_ms = 1000,
 	};
 
 	parse_args(&cfg, argc, argv);
-	init_program(&cfg);
 
-	for (i=0; run; i++) {
+	if (cfg.attr.sched_runtime > 0 && cfg.attr.sched_period > 0 &&
+			cfg.attr.sched_deadline > 0) {
+		init_sched_dead(&cfg);
+	}
+
+	for (i = 0; run; i++) {
 		busy_cycles(&cfg);
 		xsleep(&cfg);
 
+		/* run forever if program_iterations is set to 0 */
 		if (cfg.program_iterations != 0 && i == cfg.program_iterations)
 			run = false;
 	}
 
 	return EXIT_SUCCESS;
 }
-
-
