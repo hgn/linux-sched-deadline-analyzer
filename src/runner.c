@@ -81,39 +81,60 @@ int sched_getattr(pid_t pid, struct sched_attr *attr, unsigned int size,
 
 void print_help(void)
 {
-	printf("runner [options]\tAll times in milliseconds\n\
-			-i <number> number of CPU iterations\n\
-			-I <number> number of program loop iterations. Used to prevent\n\t\
-			the program running forever and potentially freezing your system.\n\t\
-			set to 0 to run forever.\n\
-			-s <number> sleep-time for xsleep\n\
-			-p <number> period for sched_dead\n\
-			-r <number> run-time for sched_dead\n\
-			-d <number> deadline for sched_dead\n");
+	printf("runner [options]\t(All times in milliseconds)\n"
+			"\t-i\n\t--cpu-iterations <number> number of CPU iterations\n\n"
+			"\t-I\n\t--program-iterations <number> number of program loop"
+			" iterations.\n\tUsed to prevent "
+			"the program running forever and potentially freezing\n\tyour system."
+			" Set to 0 to run forever.\n\n"
+			"\t-s\n\t--sleeptime <number> sleep-time for xsleep\n\n"
+			"\t-p\n\t--period <number> period for sched_dead\n\n"
+			"\t-r\n\t--runtime <number> run-time for sched_dead\n\n"
+			"\t-d\n\t--deadline <number> deadline for sched_dead\n\n");
 }
 
 
-void parse_args(struct config *cfg, int argc, char *argv[])
+void parse_args(struct config *cfg, int argc, char **argv)
 {
-	int opt;
-	while ((opt = getopt(argc, argv, "i:I:s:r:p:d:")) != -1) {
+	int opt, option_index = 0;
+	static struct option long_options[] = {
+	   {"cpu-iterations", required_argument, NULL, 1},
+	   {"program-iterations", required_argument, NULL, 2},
+	   {"sleeptime",  required_argument, NULL, 3},
+	   {"runtime", required_argument, NULL, 4},
+	   {"deadline", required_argument, NULL, 5},
+	   {"period", required_argument, NULL, 6},
+	   {NULL, no_argument, NULL, 0}
+	};
+
+	for (;;) {
+		opt = getopt_long(argc, argv, "i:I:s:r:p:d:", long_options, &option_index);
+		if (opt == -1)
+		   break;
+
 		switch (opt) {
+		case 1:
 		case 'i':
 			cfg->cpu_iterations = (unsigned long long)atoll(optarg);
 			break;
+		case 2:
 		case 'I':
 			cfg->program_iterations = (unsigned)atoi(optarg);
 			break;
+		case 3:
 		case 's':
 			cfg->sleeptime_ms = (unsigned)atoi(optarg);
 			break;
 		/* scheduler times are ns, user gives ms */
+		case 4:
 		case 'r':
 			cfg->attr.sched_runtime = (__u64)(MS_TO_NS_FACTOR * atoi(optarg));
 			break;
+		case 5:
 		case 'd':
 			cfg->attr.sched_deadline = (__u64)(MS_TO_NS_FACTOR * atoi(optarg));
 			break;
+		case 6:
 		case 'p':
 			cfg->attr.sched_period = (__u64)(MS_TO_NS_FACTOR * atoi(optarg));
 			break;
@@ -160,13 +181,6 @@ unsigned us_timediff(struct timeval tv_start, struct timeval tv_end)
 	end = tv_end.tv_sec;
 	sustart = tv_start.tv_usec;
 	suend = tv_end.tv_usec;
-
-	/*
-	 printf("ende: %li\n", end); 
-	 printf("start: %li\n", start); 
-	 printf("suende: %li\n", suend); 
-	 printf("sustart: %li\n", sustart); 
-	*/
 
 	diff = end - start;
 	/* printf("End - Start in s: %u\n", diff); */
