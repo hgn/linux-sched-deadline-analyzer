@@ -3,7 +3,7 @@
 # start 4 processes in background
 # 3 deadline scheduler processes and a busy SCHED_OTHER
 # process
-
+cd $(dirname $0)
 sh ../configure-cpu-set.sh
 
 cpu_iter=1000000

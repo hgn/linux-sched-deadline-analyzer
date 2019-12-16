@@ -97,44 +97,53 @@ void print_help(void)
 void parse_args(struct config *cfg, int argc, char **argv)
 {
 	int opt, option_index = 0;
+	enum longopt_nr {
+		CPU_ITERATIONS = 1,
+		PROGRAM_ITERATIONS,
+		SLEEPTIME,
+		RUNTIME,
+		DEADLINE,
+		PERIOD
+	};
+
 	static struct option long_options[] = {
-	   {"cpu-iterations", required_argument, NULL, 1},
-	   {"program-iterations", required_argument, NULL, 2},
-	   {"sleeptime",  required_argument, NULL, 3},
-	   {"runtime", required_argument, NULL, 4},
-	   {"deadline", required_argument, NULL, 5},
-	   {"period", required_argument, NULL, 6},
+	   {"cpu-iterations", required_argument, NULL, CPU_ITERATIONS},
+	   {"program-iterations", required_argument, NULL, PROGRAM_ITERATIONS},
+	   {"sleeptime",  required_argument, NULL, SLEEPTIME},
+	   {"runtime", required_argument, NULL, RUNTIME},
+	   {"deadline", required_argument, NULL, DEADLINE},
+	   {"period", required_argument, NULL, PERIOD},
 	   {NULL, no_argument, NULL, 0}
 	};
 
 	for (;;) {
 		opt = getopt_long(argc, argv, "i:I:s:r:p:d:", long_options, &option_index);
 		if (opt == -1)
-		   break;
+			break;
 
 		switch (opt) {
-		case 1:
+		case CPU_ITERATIONS:
 		case 'i':
 			cfg->cpu_iterations = (unsigned long long)atoll(optarg);
 			break;
-		case 2:
+		case PROGRAM_ITERATIONS:
 		case 'I':
 			cfg->program_iterations = (unsigned)atoi(optarg);
 			break;
-		case 3:
+		case SLEEPTIME:
 		case 's':
 			cfg->sleeptime_ms = (unsigned)atoi(optarg);
 			break;
 		/* scheduler times are ns, user gives ms */
-		case 4:
+		case RUNTIME:
 		case 'r':
 			cfg->attr.sched_runtime = (__u64)(MS_TO_NS_FACTOR * atoi(optarg));
 			break;
-		case 5:
+		case DEADLINE:
 		case 'd':
 			cfg->attr.sched_deadline = (__u64)(MS_TO_NS_FACTOR * atoi(optarg));
 			break;
-		case 6:
+		case PERIOD:
 		case 'p':
 			cfg->attr.sched_period = (__u64)(MS_TO_NS_FACTOR * atoi(optarg));
 			break;
