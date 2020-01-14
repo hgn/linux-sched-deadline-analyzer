@@ -21,6 +21,10 @@
 #define MS_TO_NS_FACTOR (1ULL * 1000 * 1000)
 #define S_TO_US_FACTOR (1ULL * 1000 * 1000)
 
+#define ROUGHLY_EQUAL(x, y) (x < y + 1000 && x > y - 1000)
+#define CALC_TIME_US (1ULL * 100 * 1000)
+#define CPU_TICK_REG (1ULL * 1000 * 1000)
+
 /* XXX use the proper syscall numbers */
 #ifdef __x86_64__
 #define __NR_sched_setattr           314
@@ -116,11 +120,8 @@ void parse_args(struct config *cfg, int argc, char **argv)
 	   {NULL, no_argument, NULL, 0}
 	};
 
-	for (;;) {
-		opt = getopt_long(argc, argv, "i:I:s:r:p:d:", long_options, &option_index);
-		if (opt == -1)
-			break;
-
+	opt = getopt_long(argc, argv, "i:I:s:r:p:d:", long_options, &option_index);
+	while (opt != -1) {
 		switch (opt) {
 		case CPU_ITERATIONS:
 		case 'i':
@@ -153,6 +154,8 @@ void parse_args(struct config *cfg, int argc, char **argv)
 			exit(EXIT_FAILURE);
 			break;
 		}
+
+		opt = getopt_long(argc, argv, "i:I:s:r:p:d:", long_options, &option_index);
 	}
 }
 
@@ -200,7 +203,7 @@ unsigned us_timediff(struct timeval tv_start, struct timeval tv_end)
 }
 
 
-void busy_cycles(struct config *cfg)
+unsigned busy_cycles(struct config *cfg)
 {
 	unsigned long long i = cfg->cpu_iterations;
 	struct timeval tv_start, tv_end;
@@ -210,7 +213,27 @@ void busy_cycles(struct config *cfg)
 	while (i--);
 
 	gettimeofday(&tv_end, NULL);
-	printf("%u us run-time\n", us_timediff(tv_start, tv_end));
+	return us_timediff(tv_start, tv_end);
+}
+
+
+void oak_iterations(struct config *cfg)
+{
+	unsigned i, runtime;
+	unsigned long long averaging = 0;
+
+	puts("Normalizing nr. of cpu iterations to fit 1 second...");
+	for (i = 0; i < 100; i++) {
+		runtime = busy_cycles(cfg);
+		while (!(runtime > CALC_TIME_US - 10000 && runtime < CALC_TIME_US + 10000)) {
+			cfg->cpu_iterations += CPU_TICK_REG;
+			runtime = busy_cycles(cfg);
+		}
+		averaging += cfg->cpu_iterations;
+	}
+
+	averaging /= 100;
+	cfg->cpu_iterations = averaging;
 }
 
 
@@ -254,13 +277,17 @@ int main(int argc, char *argv[])
 
 	parse_args(&cfg, argc, argv);
 
+	if (cfg.cpu_iterations == 1 * 1000 * 1000) {
+		oak_iterations(&cfg);
+	}
+
 	if (cfg.attr.sched_runtime > 0 && cfg.attr.sched_period > 0 &&
 			cfg.attr.sched_deadline > 0) {
 		init_sched_dead(&cfg);
 	}
 
 	for (i = 0; run; i++) {
-		busy_cycles(&cfg);
+		printf("Calculated for %u us.\n", busy_cycles(&cfg));
 		xsleep(&cfg);
 
 		/* run forever if program_iterations is set to 0 */
