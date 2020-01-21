@@ -19,6 +19,7 @@
 #define SCHED_DEADLINE       6
 
 #define MS_TO_NS_FACTOR (1ULL * 1000 * 1000)
+#define MS_TO_US_FACTOR (1ULL * 1000)
 #define S_TO_US_FACTOR (1ULL * 1000 * 1000)
 
 #define ROUGHLY_EQUAL(x, y) (x < y + 1000 && x > y - 1000)
@@ -64,6 +65,7 @@ struct config {
 	struct sched_attr attr;
 	unsigned long long cpu_iterations, program_iterations;
 	unsigned sleeptime_ms;
+	unsigned long long calc_time_us;
 };
 
 
@@ -106,8 +108,10 @@ void parse_args(struct config *cfg, int argc, char **argv)
 		PROGRAM_ITERATIONS,
 		SLEEPTIME,
 		RUNTIME,
+		CALCTIME,
 		DEADLINE,
-		PERIOD
+		PERIOD,
+		HELP,
 	};
 
 	static struct option long_options[] = {
@@ -115,12 +119,14 @@ void parse_args(struct config *cfg, int argc, char **argv)
 	   {"program-iterations", required_argument, NULL, PROGRAM_ITERATIONS},
 	   {"sleeptime",  required_argument, NULL, SLEEPTIME},
 	   {"runtime", required_argument, NULL, RUNTIME},
+	   {"calctime", required_argument, NULL, CALCTIME},
 	   {"deadline", required_argument, NULL, DEADLINE},
 	   {"period", required_argument, NULL, PERIOD},
+	   {"help", no_argument, NULL, HELP},
 	   {NULL, no_argument, NULL, 0}
 	};
 
-	opt = getopt_long(argc, argv, "i:I:s:r:p:d:", long_options, &option_index);
+	opt = getopt_long(argc, argv, "c:i:I:s:r:p:d:h", long_options, &option_index);
 	while (opt != -1) {
 		switch (opt) {
 		case CPU_ITERATIONS:
@@ -140,6 +146,11 @@ void parse_args(struct config *cfg, int argc, char **argv)
 		case 'r':
 			cfg->attr.sched_runtime = (__u64)(MS_TO_NS_FACTOR * atoi(optarg));
 			break;
+		case CALCTIME:
+		case 'c':
+			cfg->calc_time_us =
+				(unsigned long long)(MS_TO_US_FACTOR * atoll(optarg));
+			break;
 		case DEADLINE:
 		case 'd':
 			cfg->attr.sched_deadline = (__u64)(MS_TO_NS_FACTOR * atoi(optarg));
@@ -147,6 +158,11 @@ void parse_args(struct config *cfg, int argc, char **argv)
 		case PERIOD:
 		case 'p':
 			cfg->attr.sched_period = (__u64)(MS_TO_NS_FACTOR * atoi(optarg));
+			break;
+		case HELP:
+		case 'h':
+			print_help();
+			exit(EXIT_SUCCESS);
 			break;
 		default:
 			fprintf(stderr, "arguments wrong somehow, exiting...\n");
@@ -222,12 +238,15 @@ void oak_iterations(struct config *cfg)
 	unsigned i, runtime;
 	unsigned long long averaging = 0;
 
-	puts("Normalizing nr. of cpu iterations to fit 1 second...");
+	printf("Normalizing cpu-iterations to fit %llu ms.\n",
+			cfg->calc_time_us / 1000);
 	for (i = 0; i < 100; i++) {
 		runtime = busy_cycles(cfg);
-		while (!(runtime > CALC_TIME_US - 10000 && runtime < CALC_TIME_US + 10000)) {
+		while (!(runtime > cfg->calc_time_us - 10000 &&
+					runtime < cfg->calc_time_us + 10000)) {
 			cfg->cpu_iterations += CPU_TICK_REG;
 			runtime = busy_cycles(cfg);
+			printf("%u\n", runtime);
 		}
 		averaging += cfg->cpu_iterations;
 	}
@@ -239,6 +258,9 @@ void oak_iterations(struct config *cfg)
 
 void xsleep(struct config *cfg)
 {
+	if (cfg->sleeptime_ms == 0)
+		return;
+
 	struct timeval tv_start, tv_end;
 	gettimeofday(&tv_start, NULL);
 
@@ -273,11 +295,15 @@ int main(int argc, char *argv[])
 		.cpu_iterations = 1 * 1000 * 1000,
 		.program_iterations = 1,
 		.sleeptime_ms = 1000,
+		.calc_time_us = 1000 * MS_TO_US_FACTOR,
 	};
 
 	parse_args(&cfg, argc, argv);
 
-	if (cfg.cpu_iterations == 1 * 1000 * 1000) {
+	/* A sleeptime equal 0 indicates that the user wants to create a high
+	 * workload with big number of cpu-iterations.
+	 * In this case, do not oak. */
+	if (cfg.sleeptime_ms > 0) {
 		oak_iterations(&cfg);
 	}
 
