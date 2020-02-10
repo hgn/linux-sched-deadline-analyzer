@@ -24,7 +24,7 @@
 
 #define ROUGHLY_EQUAL(x, y) (x < y + 1000 && x > y - 1000)
 #define CALC_TIME_US (1ULL * 100 * 1000)
-#define CPU_TICK_REG (1ULL * 1000 * 1000)
+#define CPU_TICK_REG (10ULL * 1000 * 1000)
 
 /* XXX use the proper syscall numbers */
 #ifdef __x86_64__
@@ -246,13 +246,14 @@ void oak_iterations(struct config *cfg)
 					runtime < cfg->calc_time_us + 10000)) {
 			cfg->cpu_iterations += CPU_TICK_REG;
 			runtime = busy_cycles(cfg);
-			printf("%u\n", runtime);
+			printf("Runtime: %u ms\n", runtime / 1000);
 		}
 		averaging += cfg->cpu_iterations;
 	}
 
 	averaging /= 100;
 	cfg->cpu_iterations = averaging;
+	puts("leaving oak");
 }
 
 
