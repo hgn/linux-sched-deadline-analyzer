@@ -23,10 +23,11 @@
 #define S_TO_US_FACTOR (1ULL * 1000 * 1000)
 
 #define CALC_TIME_US (1ULL * 100 * 1000)
-#define CPU_TICK_REG (10ULL * 1000 * 1000)
 
 #define DEFAULT_SLEEPTIME 1000
 #define DEFAULT_CALCTIME 100
+
+#define OAKING_LOOPS 10
 
 /* XXX use the proper syscall numbers */
 #ifdef __x86_64__
@@ -128,12 +129,8 @@ void parse_args(struct config *cfg, int argc, char **argv)
 	   {NULL, no_argument, NULL, 0}
 	};
 
-	for (;;) {
-		opt = getopt_long(argc, argv, "c:i:I:s:r:p:d:h",
-				long_options, &option_index);
-		if (opt == -1)
-			break;
-
+	while ((opt = getopt_long(argc, argv, "c:i:I:s:r:p:d:h",
+				long_options, &option_index)) != -1) {
 		switch (opt) {
 		case CPU_ITERATIONS:
 		case 'i':
@@ -256,7 +253,7 @@ void oak_cpu(struct config *cfg)
 	long long reg = 0, integ = 0;
 
 	puts("entering oak loop");
-	for (i = 0; i < 10; i++) {
+	for (i = 0; i < OAKING_LOOPS; i++) {
 		calctime_now = 0, reg = 0, integ = 0;
 
 		do {
@@ -272,7 +269,7 @@ void oak_cpu(struct config *cfg)
 		averaging += integ;
 	}
 
-	cfg->cpu_iterations = averaging / 100;
+	cfg->cpu_iterations = averaging / OAKING_LOOPS;
 	printf("Set CPU-iterations to %llu.\n", cfg->cpu_iterations);
 	puts("Leaving oak.");
 }
