@@ -244,6 +244,11 @@ static inline bool five_perct_exact(unsigned now, unsigned goal)
 }
 
 
+/*
+ * Calculates a number for the cpu to decrement so the time needed to reach 0
+ * equals roughly the configured time calc_time_us.
+ * This functions implements a PD regulator.
+ */
 void oak_cpu(struct config *cfg)
 {
 	long long calctime_now = 0, calctime_goal = cfg->calc_time_us;
