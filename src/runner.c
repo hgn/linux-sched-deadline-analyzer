@@ -247,7 +247,7 @@ static inline bool five_perct_exact(unsigned now, unsigned goal)
 /*
  * Calculates a number for the cpu to decrement so the time needed to reach 0
  * equals roughly the configured time calc_time_us.
- * This functions implements a PD regulator.
+ * This functions implements a PI regulator.
  */
 void oak_cpu(struct config *cfg)
 {
@@ -322,7 +322,6 @@ int main(int argc, char *argv[])
 	};
 
 	parse_args(&cfg, argc, argv);
-
 	oak_cpu(&cfg);
 
 	if (cfg.attr.sched_runtime > 0 && cfg.attr.sched_period > 0 &&
