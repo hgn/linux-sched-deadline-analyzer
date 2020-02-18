@@ -11,11 +11,15 @@
 # just an simple example to get things done.
 cd $(dirname $0)
 sh ../configure-cpu-set.sh
-../../src/runner -i 1000000 -I 0 -s 100 -r 100 -d 200 -p 1000 &
+../../src/runner -I 0 --period 2000 --runtime 150 --deadline 500 --calctime 100 --sleeptime 2000 & 
 PID1=$!
 
-perf record -p $PID1 &
+EVENTS='{raw_syscalls:*,sched:sched_switch,sched:sched_migrate_task,'
+'sched:sched_process_exec,sched:sched_process_fork,sched:sched_process_exit,'
+'sched:sched_stat_runtime,sched:sched_stat_wait,sched:sched_stat_sleep,'
+'sched:sched_stat_blocked,sched:sched_stat_iowait}'
 
-sleep 1
+perf sched record -p $PID1 -e $EVENTS &
 
+sleep 60
 kill -9 $PID1

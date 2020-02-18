@@ -22,9 +22,12 @@
 #define MS_TO_US_FACTOR (1ULL * 1000)
 #define S_TO_US_FACTOR (1ULL * 1000 * 1000)
 
-#define ROUGHLY_EQUAL(x, y) (x < y + 1000 && x > y - 1000)
 #define CALC_TIME_US (1ULL * 100 * 1000)
-#define CPU_TICK_REG (1ULL * 1000 * 1000)
+
+#define DEFAULT_SLEEPTIME 1000
+#define DEFAULT_CALCTIME 100
+
+#define OAKING_LOOPS 10
 
 /* XXX use the proper syscall numbers */
 #ifdef __x86_64__
@@ -71,7 +74,7 @@ struct config {
 
 int sched_setattr(pid_t pid, const struct sched_attr *attr, unsigned int flags)
 {
-	printf("Periode: %llu, Runtime: %llu, Deadline: %llu\n",
+	printf("Set: Period: %llu us, Runtime: %llu us, Deadline: %llu\n us",
 			attr->sched_period, attr->sched_runtime, attr->sched_deadline);
 
 	return syscall(__NR_sched_setattr, pid, attr, flags);
@@ -126,8 +129,8 @@ void parse_args(struct config *cfg, int argc, char **argv)
 	   {NULL, no_argument, NULL, 0}
 	};
 
-	opt = getopt_long(argc, argv, "c:i:I:s:r:p:d:h", long_options, &option_index);
-	while (opt != -1) {
+	while ((opt = getopt_long(argc, argv, "c:i:I:s:r:p:d:h",
+				long_options, &option_index)) != -1) {
 		switch (opt) {
 		case CPU_ITERATIONS:
 		case 'i':
@@ -170,8 +173,6 @@ void parse_args(struct config *cfg, int argc, char **argv)
 			exit(EXIT_FAILURE);
 			break;
 		}
-
-		opt = getopt_long(argc, argv, "i:I:s:r:p:d:", long_options, &option_index);
 	}
 }
 
@@ -219,40 +220,63 @@ unsigned us_timediff(struct timeval tv_start, struct timeval tv_end)
 }
 
 
-unsigned busy_cycles(struct config *cfg)
+unsigned busy_cycles(unsigned long long iterations)
 {
-	unsigned long long i = cfg->cpu_iterations;
 	struct timeval tv_start, tv_end;
 
 	gettimeofday(&tv_start, NULL);
 
-	while (i--);
+	puts("start decrementing.");
+	while (iterations--);
+	puts("done decrementing.");
 
 	gettimeofday(&tv_end, NULL);
 	return us_timediff(tv_start, tv_end);
 }
 
 
-void oak_iterations(struct config *cfg)
+static inline bool five_perct_exact(unsigned now, unsigned goal)
 {
-	unsigned i, runtime;
-	unsigned long long averaging = 0;
+	if ((now > goal * 0.95) && (now < goal * 1.05))
+		return true;
+	else
+		return false;
+}
 
-	printf("Normalizing cpu-iterations to fit %llu ms.\n",
-			cfg->calc_time_us / 1000);
-	for (i = 0; i < 100; i++) {
-		runtime = busy_cycles(cfg);
-		while (!(runtime > cfg->calc_time_us - 10000 &&
-					runtime < cfg->calc_time_us + 10000)) {
-			cfg->cpu_iterations += CPU_TICK_REG;
-			runtime = busy_cycles(cfg);
-			printf("%u\n", runtime);
-		}
-		averaging += cfg->cpu_iterations;
+
+/*
+ * Calculates a number for the cpu to decrement so the time needed to reach 0
+ * equals roughly the configured time calc_time_us.
+ * This functions implements a PI regulator.
+ */
+void oak_cpu(struct config *cfg)
+{
+	long long calctime_now = 0, calctime_goal = cfg->calc_time_us;
+	unsigned kp = 5;
+	unsigned long long averaging = 0;
+	int i;
+	long long reg = 0, integ = 0;
+
+	puts("entering oak loop");
+	for (i = 0; i < OAKING_LOOPS; i++) {
+		calctime_now = 0, reg = 0, integ = 0;
+
+		do {
+			reg = calctime_goal - calctime_now;
+			reg *= kp;
+			integ += reg;
+			printf("Iterations now: %lli\n", integ);
+			calctime_now = busy_cycles(integ);
+			printf("Calctime now: %llu, goal: %llu\n", calctime_now, calctime_goal);
+		} while (!five_perct_exact(calctime_now, calctime_goal));
+		printf("Calctime now: %llu, goal: %llu\n", calctime_now, calctime_goal);
+
+		averaging += integ;
 	}
 
-	averaging /= 100;
-	cfg->cpu_iterations = averaging;
+	cfg->cpu_iterations = averaging / OAKING_LOOPS;
+	printf("Set CPU-iterations to %llu.\n", cfg->cpu_iterations);
+	puts("Leaving oak.");
 }
 
 
@@ -264,8 +288,7 @@ void xsleep(struct config *cfg)
 	struct timeval tv_start, tv_end;
 	gettimeofday(&tv_start, NULL);
 
-	/* printf("Sleeping %u us...\n", cfg->sleeptime_ms); */
-	usleep(cfg->sleeptime_ms * 1000);
+	usleep(cfg->sleeptime_ms * MS_TO_US_FACTOR);
 
 	gettimeofday(&tv_end, NULL);
 
@@ -294,18 +317,12 @@ int main(int argc, char *argv[])
 		.attr = attr,
 		.cpu_iterations = 1 * 1000 * 1000,
 		.program_iterations = 1,
-		.sleeptime_ms = 1000,
-		.calc_time_us = 1000 * MS_TO_US_FACTOR,
+		.sleeptime_ms = DEFAULT_SLEEPTIME,
+		.calc_time_us = DEFAULT_CALCTIME * MS_TO_US_FACTOR,
 	};
 
 	parse_args(&cfg, argc, argv);
-
-	/* A sleeptime equal 0 indicates that the user wants to create a high
-	 * workload with big number of cpu-iterations.
-	 * In this case, do not oak. */
-	if (cfg.sleeptime_ms > 0) {
-		oak_iterations(&cfg);
-	}
+	oak_cpu(&cfg);
 
 	if (cfg.attr.sched_runtime > 0 && cfg.attr.sched_period > 0 &&
 			cfg.attr.sched_deadline > 0) {
@@ -313,7 +330,7 @@ int main(int argc, char *argv[])
 	}
 
 	for (i = 0; run; i++) {
-		printf("Calculated for %u us.\n", busy_cycles(&cfg));
+		printf("Calculated for %u us.\n", busy_cycles(cfg.cpu_iterations));
 		xsleep(&cfg);
 
 		/* run forever if program_iterations is set to 0 */

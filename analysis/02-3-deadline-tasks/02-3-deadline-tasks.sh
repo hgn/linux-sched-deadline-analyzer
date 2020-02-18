@@ -6,24 +6,24 @@
 cd $(dirname $0)
 sh ../configure-cpu-set.sh
 
-cpu_iter=1000000
 
-./src/runner -i cpu_iter -I 0 -s 200 -r 100 -d 150 -p 1000  &
+perf sched record ../../src/runner -I 0 --period 2000 --runtime 150 --deadline 500 --calctime 100 --sleeptime 2000 & 
 PID1=$!
+echo $PID1
 
-./src/runner -i cpu_iter -I 0 -s 200 -r 100 -d 150 -p 1000  &
+../../src/runner -I 0 --period 2000 --runtime 150 --deadline 500 --calctime 100 --sleeptime 2000 & 
 PID2=$!
 
-./src/runner -i cpu_iter -I 0 -s 200 -r 100 -d 150 -p 1000  &
+../../src/runner -I 0 --period 2000 --runtime 150 --deadline 500 --calctime 100 --sleeptime 2000 & 
 PID3=$!
 
 # sched other
-./src/runner -i 1000000000000 -I 0 -s 200 -r 0 -d 0 -p 0  &
+../../src/runner -I 0 --cpu-iterations 1000000000000 --sleeptime 0 & 
 PID4=$!
 
 
 # execute test for N seconds
-sleep 120
+sleep 60
 
 # kill everything
 kill -9 $PID1

@@ -1,5 +1,5 @@
 all:
-	sudo /bin/sh 01-one-sched-other-one-second.sh
+	/bin/sh 01-one-sched-other-one-second.sh
 
 clean:
 	-rm -rf perf.data perf.data.old
