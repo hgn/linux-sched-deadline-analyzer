@@ -27,7 +27,7 @@
 #define DEFAULT_SLEEPTIME 1000
 #define DEFAULT_CALCTIME 100
 
-#define OAKING_LOOPS 10
+#define OAKING_LOOPS 1
 
 /* XXX use the proper syscall numbers */
 #ifdef __x86_64__
@@ -103,6 +103,21 @@ void print_help(void)
 }
 
 
+void configure_cpu()
+{
+	const pid_t this_thread = 0;
+	cpu_set_t set;
+	CPU_ZERO(&set);
+	CPU_SET(0, &set);
+
+	if (sched_setaffinity(this_thread, sizeof(set), &set) == -1) {
+		perror("configure_cpu");
+		exit(EXIT_FAILURE);
+	}
+	puts("Successfully set to cpu 0.");
+}
+
+
 void parse_args(struct config *cfg, int argc, char **argv)
 {
 	int opt, option_index = 0;
@@ -114,6 +129,7 @@ void parse_args(struct config *cfg, int argc, char **argv)
 		CALCTIME,
 		DEADLINE,
 		PERIOD,
+		CPU,
 		HELP,
 	};
 
@@ -125,11 +141,12 @@ void parse_args(struct config *cfg, int argc, char **argv)
 	   {"calctime", required_argument, NULL, CALCTIME},
 	   {"deadline", required_argument, NULL, DEADLINE},
 	   {"period", required_argument, NULL, PERIOD},
+	   {"set-cpu", no_argument, NULL, CPU},
 	   {"help", no_argument, NULL, HELP},
 	   {NULL, no_argument, NULL, 0}
 	};
 
-	while ((opt = getopt_long(argc, argv, "c:i:I:s:r:p:d:h",
+	while ((opt = getopt_long(argc, argv, "c:i:I:s:r:p:d:hz",
 				long_options, &option_index)) != -1) {
 		switch (opt) {
 		case CPU_ITERATIONS:
@@ -162,6 +179,10 @@ void parse_args(struct config *cfg, int argc, char **argv)
 		case 'p':
 			cfg->attr.sched_period = (__u64)(MS_TO_NS_FACTOR * atoi(optarg));
 			break;
+		case CPU:
+		case 'z':
+			configure_cpu();
+			break;
 		case HELP:
 		case 'h':
 			print_help();
@@ -174,20 +195,6 @@ void parse_args(struct config *cfg, int argc, char **argv)
 			break;
 		}
 	}
-}
-
-
-/* currently unused. setaffinity does not work with sched_dead */
-void configure_cpu()
-{
-	cpu_set_t set;
-	CPU_ZERO(&set);
-	CPU_SET(0, &set);
-	if (sched_setaffinity(0, sizeof(set), &set) == -1) {
-		perror("configure_cpu");
-		exit(EXIT_FAILURE);
-	}
-	puts("Successfully set to cpu 0.");
 }
 
 
@@ -252,7 +259,7 @@ static inline bool five_perct_exact(unsigned now, unsigned goal)
 void oak_cpu(struct config *cfg)
 {
 	long long calctime_now = 0, calctime_goal = cfg->calc_time_us;
-	unsigned kp = 5;
+	unsigned kp = 20;
 	unsigned long long averaging = 0;
 	int i;
 	long long reg = 0, integ = 0;
