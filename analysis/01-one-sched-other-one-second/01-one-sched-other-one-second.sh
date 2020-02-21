@@ -13,6 +13,7 @@ cd $(dirname $0)
 sh ../configure-super-exclusive-cpu-set.sh
 ../../src/runner -I 10 --calctime 1000 --sleeptime 1000 & 
 PID1=$!
+echo $PID1 > /dev/cpuset/rt/tasks
 
 # EVENTS='{raw_syscalls:*,sched:sched_switch,sched:sched_migrate_task,'
 # 'sched:sched_process_exec,sched:sched_process_fork,sched:sched_process_exit,'
@@ -20,7 +21,7 @@ PID1=$!
 # 'sched:sched_stat_blocked,sched:sched_stat_iowait}'
 EVENTS='{sched:sched_switch}'
 
-~/perf sched record -p $PID1 -e $EVENTS
+~/perf sched record -a -e $EVENTS
 
 # sleep 60
 # kill -9 $PID1

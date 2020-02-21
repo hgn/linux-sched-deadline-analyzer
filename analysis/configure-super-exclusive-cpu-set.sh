@@ -18,7 +18,8 @@ if [ ! -d "$/dev/cpuset/" ]; then
 	echo 0 > /dev/cpuset/rt/cpuset.sched_load_balance
 	echo 1 > /dev/cpuset/rt/cpuset.mem_hardwall
 
-	for T in `cat tasks`; do echo "Moving " $T; echo $T > /dev/cpuset/sys/tasks; done
-
-	echo $$ > /dev/cpuset/rt/tasks
+	ps -e -o pid |\
+		while read T; do
+			echo $T >> /dev/cpuset/sys/tasks
+		done
 fi
