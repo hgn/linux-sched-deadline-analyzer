@@ -10,7 +10,7 @@
 # This analyzer scripts are used by the other scripts, this is
 # just an simple example to get things done.
 cd $(dirname $0)
-sh ../configure-cpu-set.sh
+sh ../configure-super-exclusive-cpu-set.sh
 ../../src/runner -I 10 --calctime 1000 --sleeptime 1000 & 
 PID1=$!
 
@@ -18,7 +18,7 @@ PID1=$!
 # 'sched:sched_process_exec,sched:sched_process_fork,sched:sched_process_exit,'
 # 'sched:sched_stat_runtime,sched:sched_stat_wait,sched:sched_stat_sleep,'
 # 'sched:sched_stat_blocked,sched:sched_stat_iowait}'
-EVENTS='{sched:sched_sched_switch}'
+EVENTS='{sched:sched_switch}'
 
 ~/perf sched record -p $PID1 -e $EVENTS
 
