@@ -274,7 +274,6 @@ void oak_cpu(struct config *cfg)
 
 		do {
 			calctime_now = busy_cycles(reg);
-			
 			if (calctime_now > calctime_goal)
 				reg -= reg / 2;
 			else
@@ -327,7 +326,7 @@ int main(int argc, char *argv[])
 
 	struct config cfg = {
 		.attr = attr,
-		.cpu_iterations = 1 * 1000 * 1000,
+		.cpu_iterations = 1 * 1000,
 		.program_iterations = 1,
 		.oak_runs = 1,
 		.sleeptime_ms = DEFAULT_SLEEPTIME,

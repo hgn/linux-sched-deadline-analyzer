@@ -10,5 +10,4 @@ if [ ! -d "$/dev/cpuset/" ]; then
 	echo 0 > /dev/cpuset/cpuset.sched_load_balance
 	echo 1 > /dev/cpuset/cpu0/cpuset.cpu_exclusive
 	echo 1 > /dev/cpuset/cpu0/cpuset.mem_exclusive
-	echo $$ > /dev/cpuset/cpu0/tasks
 fi
