@@ -24,8 +24,8 @@
 
 #define CALC_TIME_US (1ULL * 100 * 1000)
 
-#define DEFAULT_SLEEPTIME 1000
-#define DEFAULT_CALCTIME 100
+#define DEFAULT_SLEEPTIME_MS 1000
+#define DEFAULT_CALCTIME_MS 1000
 
 #define OAKING_LOOPS 10
 
@@ -90,19 +90,22 @@ int sched_getattr(pid_t pid, struct sched_attr *attr, unsigned int size,
 
 void print_help(void)
 {
-	printf("runner [options]\t(All times in milliseconds)\n"
-			"\t-i\n\t--cpu-iterations <number> number of CPU iterations\n\n"
+	printf("runner [options]\t(All time constants in milliseconds)\n"
+			"\t-i\n\t--cpu-iterations <number> number of CPU iterations.\n"
+			"\t\tTypically you don't want to set this number manually.\n\n"
 			"\t-I\n\t--program-iterations <number> number of program loop"
-			" iterations.\n\tUsed to prevent "
-			"the program running forever and potentially freezing\n\tyour system."
+			" iterations.\n\t\tUsed to prevent "
+			"the program running forever and potentially freezing\n\t\tyour system."
 			" Set to 0 to run forever.\n\n"
 			"\t-s\n\t--sleeptime <number> sleep-time for xsleep\n\n"
 			"\t-c\n\t--calctime <number> time the program should calculate"
-			"uninterrupted.\n\n"
+			" uninterrupted.\n\n"
 			"\t-p\n\t--period <number> period for sched_dead\n\n"
 			"\t-r\n\t--runtime <number> run-time for sched_dead\n\n"
 			"\t-d\n\t--deadline <number> deadline for sched_dead\n\n"
-			"\t-o\n\t--oak-iterations <number> no. of iterations to oak"
+			"\t-z\n\t--set-cpu Try to set the cpu-affinity to core0."
+			"Typically not used when testing with CPU-Sets\n\n"
+			"\t-o\n\t--oak-iterations <number> NO. of iterations to oak"
 			" cpu iterations to fit configured calctime.\n\n");
 }
 
@@ -220,7 +223,7 @@ void init_sched_dead(struct config *cfg)
 
 unsigned us_timediff(struct timeval tv_start, struct timeval tv_end)
 {
-	unsigned diff=0, sudiff=0;
+	unsigned diff = 0, sudiff = 0;
 	time_t start, end;
 	suseconds_t sustart, suend;
 	start = tv_start.tv_sec;
@@ -244,9 +247,9 @@ unsigned busy_cycles(unsigned long long iterations)
 	printf("Busy cycle: %u\n", cycles++);
 
 	gettimeofday(&tv_start, NULL);
-
+	// printf("start iterating. Iterations: %llu\n", iterations);
 	while (iterations--);
-
+	// puts("end iterating.");
 	gettimeofday(&tv_end, NULL);
 	return us_timediff(tv_start, tv_end);
 }
@@ -270,7 +273,7 @@ void oak_cpu(struct config *cfg)
 	puts("entering oak loop");
 	for (i = 0; i < OAKING_LOOPS; i++) {
 		calctime_now = 0, reg = 0;
-		reg = calctime_goal * 1000 * 1000;
+		reg = calctime_goal * 1000;
 
 		do {
 			calctime_now = busy_cycles(reg);
@@ -280,14 +283,15 @@ void oak_cpu(struct config *cfg)
 				reg += reg / 2;
 
 		} while (!five_perct_exact(calctime_now, calctime_goal));
-		printf("Calctime now: %llu, goal: %llu\n", calctime_now, calctime_goal);
+		printf("Calctime now: %llu, goal: %llu\n",
+				calctime_now, calctime_goal);
 
 		averaging += reg;
 	}
 
 	cfg->cpu_iterations = averaging / OAKING_LOOPS;
 	printf("Set CPU-iterations to %llu.\n", cfg->cpu_iterations);
-	puts("Leaving oak.");
+	puts("Done oaking.");
 }
 
 
@@ -298,9 +302,7 @@ void xsleep(struct config *cfg)
 
 	struct timeval tv_start, tv_end;
 	gettimeofday(&tv_start, NULL);
-
 	usleep(cfg->sleeptime_ms * MS_TO_US_FACTOR);
-
 	gettimeofday(&tv_end, NULL);
 
 	printf("%u us sleep time\n", us_timediff(tv_start, tv_end));
@@ -329,8 +331,8 @@ int main(int argc, char *argv[])
 		.cpu_iterations = 1 * 1000,
 		.program_iterations = 1,
 		.oak_runs = 1,
-		.sleeptime_ms = DEFAULT_SLEEPTIME,
-		.calc_time_us = DEFAULT_CALCTIME * MS_TO_US_FACTOR,
+		.sleeptime_ms = DEFAULT_SLEEPTIME_MS,
+		.calc_time_us = DEFAULT_CALCTIME_MS * MS_TO_US_FACTOR,
 	};
 
 	parse_args(&cfg, argc, argv);
