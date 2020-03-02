@@ -11,7 +11,7 @@
 # just an simple example to get things done.
 cd $(dirname $0)
 sh ../configure-super-exclusive-cpu-set.sh
-../../src/runner -I 100 -o 10 --calctime 1000 --sleeptime 1000 & 
+../../src/runner -I 0 -o 10 --calctime 1000 --sleeptime 1000 & 
 PID1=$!
 
 # Assign runner to the measuring cpu-set
@@ -20,7 +20,9 @@ echo $PID1 > /dev/cpuset/rt/tasks
 #EVENTS='{sched:sched_switch}'
 EVENTS='{raw_syscalls:*,sched:sched_switch,sched:sched_process_exec,sched:sched_process_fork,sched:sched_process_exit,sched:sched_stat_runtime,sched:sched_stat_wait,sched:sched_stat_sleep,sched:sched_stat_blocked,sched:sched_stat_iowait}'
 
-perf sched record -p $PID1 -e $EVENTS
+perf sched record -C 0 -e $EVENTS &
+PID2=$!
 
-# sleep 60
-# kill -9 $PID1
+sleep 120
+kill -15 $PID1
+kill -15 $PID2
