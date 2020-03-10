@@ -20,7 +20,7 @@ echo $PID1 > /dev/cpuset/rt/tasks
 #EVENTS='{sched:sched_switch}'
 EVENTS='{raw_syscalls:*,sched:sched_switch,sched:sched_process_exec,sched:sched_process_fork,sched:sched_process_exit,sched:sched_stat_runtime,sched:sched_stat_wait,sched:sched_stat_sleep,sched:sched_stat_blocked,sched:sched_stat_iowait}'
 
-perf sched record -C 0 -e $EVENTS &
+perf sched record -C 3 -e $EVENTS &
 PID2=$!
 
 sleep 120

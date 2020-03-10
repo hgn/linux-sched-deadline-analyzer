@@ -77,6 +77,7 @@ int sched_setattr(pid_t pid, const struct sched_attr *attr, unsigned int flags)
 	printf("Set: Period: %llu us, Runtime: %llu us, Deadline: %llu\n us",
 			attr->sched_period, attr->sched_runtime, attr->sched_deadline);
 
+
 	return syscall(__NR_sched_setattr, pid, attr, flags);
 }
 
@@ -283,14 +284,16 @@ void oak_cpu(struct config *cfg)
 				reg += reg / 2;
 
 		} while (!five_perct_exact(calctime_now, calctime_goal));
+		/*
 		printf("Calctime now: %llu, goal: %llu\n",
 				calctime_now, calctime_goal);
+		*/
 
 		averaging += reg;
 	}
 
 	cfg->cpu_iterations = averaging / OAKING_LOOPS;
-	printf("Set CPU-iterations to %llu.\n", cfg->cpu_iterations);
+	//printf("Set CPU-iterations to %llu.\n", cfg->cpu_iterations);
 	puts("Done oaking.");
 }
 
