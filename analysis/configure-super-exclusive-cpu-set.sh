@@ -1,7 +1,7 @@
 #! /usr/bin/bash
 
 mkdir /dev/cpuset
-mount -t cgroup -o cpuset cpuset /dev/cpuset
+mount -t cpuset cpuset /dev/cpuset
 
 # create a cpu-set for all conventional tasks
 # assign all systems tasks to it
@@ -9,7 +9,7 @@ mkdir /dev/cpuset/sys
 N=nproc
 
 # give this set all CPUs for now
-# echo 0-$N > /dev/cpuset/sys/cpuset.cpus
+echo 0-2,4-7 > /dev/cpuset/sys/cpuset.cpus
 
 echo 1 > /dev/cpuset/sys/cpuset.cpu_exclusive
 echo 0 > /dev/cpuset/sys/cpuset.mems
@@ -26,5 +26,5 @@ echo 1 > /dev/cpuset/rt/cpuset.mem_hardwall
 
 ps -e -o pid |\
 while read T; do
-	echo $T >> /dev/cpuset/sys/tasks
+	echo $T > /dev/cpuset/sys/tasks
 done
