@@ -9,7 +9,7 @@ mkdir /dev/cpuset/sys
 N=nproc
 
 # give this set all CPUs for now
-echo 0-2,4-7 > /dev/cpuset/sys/cpuset.cpus
+echo 0-2 > /dev/cpuset/sys/cpuset.cpus
 
 echo 1 > /dev/cpuset/sys/cpuset.cpu_exclusive
 echo 0 > /dev/cpuset/sys/cpuset.mems
