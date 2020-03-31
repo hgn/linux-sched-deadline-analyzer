@@ -26,5 +26,8 @@ sleep 120
 kill -15 $PID1
 kill -15 $PID2
 
+sleep 2
+
 mkdir results
 perf script > ./results/results.txt
+python3 timeparser.py
