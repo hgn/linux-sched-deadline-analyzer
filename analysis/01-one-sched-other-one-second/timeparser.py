@@ -1,4 +1,5 @@
 import re
+import csv
 
 first_time = True
 
@@ -43,13 +44,15 @@ def line_parser(line, switch_in, switch_out):
             first_time = False
 
 
-def printer(switch_in, switch_out):
+def storer(switch_in, switch_out):
+    f = open('./results/results.csv', 'wt')
     first_time = True
     t_in_prev = 0
     print("Times in microseconds.")
     print("{:>5} {:>20} {:>30} {:>20}"
             .format("Nr.", "switch_in_timestamp", "time_since_list_switch_in",
                 "runtime"))
+    writer = csv.writer(f, delimiter=',')
 
     iter_list = zip(range(1, len(switch_in) + 1), switch_in, switch_out)
     for nr, t_in, t_out in iter_list:
@@ -65,6 +68,10 @@ def printer(switch_in, switch_out):
         t_in_prev = t_in
         if nr % 5 == 0:
             print("")
+        writer.writerow([nr, t_in, since_last, runtime])
+
+    f.close()
+
 
 
 def main():
@@ -77,7 +84,7 @@ def main():
         line_parser(line, switch_in, switch_out)
     f.close()
 
-    printer(switch_in, switch_out)
+    storer(switch_in, switch_out)
 
 
 if __name__ == '__main__':
