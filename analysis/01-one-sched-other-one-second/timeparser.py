@@ -43,20 +43,41 @@ def line_parser(line, switch_in, switch_out):
             first_time = False
 
 
+def printer(switch_in, switch_out):
+    first_time = True
+    t_in_prev = 0
+    print("Times in microseconds.")
+    print("{:>5} {:>20} {:>30} {:>20}"
+            .format("Nr.", "switch_in_timestamp", "time_since_list_switch_in",
+                "runtime"))
+
+    iter_list = zip(range(1, len(switch_in) + 1), switch_in, switch_out)
+    for nr, t_in, t_out in iter_list:
+        since_last = t_in - t_in_prev
+        runtime = t_out - t_in
+
+        if first_time:
+            since_last = 0
+            first_time = False
+
+        line_new = '{:>5} {:>20} {:>30} {:>20}'.format(nr, t_in, since_last, runtime)
+        print(line_new)
+        t_in_prev = t_in
+        if nr % 5 == 0:
+            print("")
+
+
 def main():
-    rein = open("./results/results.txt")
+    f = open("./results/results.txt")
 
     switch_in  = []
     switch_out = []
 
-    for line in rein:
+    for line in f:
         line_parser(line, switch_in, switch_out)
-    rein.close()
+    f.close()
 
-    print('switch_in  switch_out  delta   (in microseconds)')
-    for hinein, hinaus in zip(switch_in, switch_out):
-        delta = hinaus - hinein
-        print(hinein, hinaus, delta)
+    printer(switch_in, switch_out)
 
 
 if __name__ == '__main__':
