@@ -24,8 +24,8 @@
 
 #define CALC_TIME_US (1ULL * 100 * 1000)
 
-#define DEFAULT_SLEEPTIME 1000
-#define DEFAULT_CALCTIME 100
+#define DEFAULT_SLEEPTIME_MS 1000
+#define DEFAULT_CALCTIME_MS 1000
 
 #define OAKING_LOOPS 10
 
@@ -67,7 +67,7 @@ struct sched_attr {
 struct config {
 	struct sched_attr attr;
 	unsigned long long cpu_iterations, program_iterations;
-	unsigned sleeptime_ms;
+	unsigned sleeptime_ms, oak_runs;
 	unsigned long long calc_time_us;
 };
 
@@ -76,6 +76,7 @@ int sched_setattr(pid_t pid, const struct sched_attr *attr, unsigned int flags)
 {
 	printf("Set: Period: %llu us, Runtime: %llu us, Deadline: %llu\n us",
 			attr->sched_period, attr->sched_runtime, attr->sched_deadline);
+
 
 	return syscall(__NR_sched_setattr, pid, attr, flags);
 }
@@ -90,16 +91,38 @@ int sched_getattr(pid_t pid, struct sched_attr *attr, unsigned int size,
 
 void print_help(void)
 {
-	printf("runner [options]\t(All times in milliseconds)\n"
-			"\t-i\n\t--cpu-iterations <number> number of CPU iterations\n\n"
+	printf("runner [options]\t(All time constants in milliseconds)\n"
+			"\t-i\n\t--cpu-iterations <number> number of CPU iterations.\n"
+			"\t\tTypically you don't want to set this number manually.\n\n"
 			"\t-I\n\t--program-iterations <number> number of program loop"
-			" iterations.\n\tUsed to prevent "
-			"the program running forever and potentially freezing\n\tyour system."
+			" iterations.\n\t\tUsed to prevent "
+			"the program running forever and potentially freezing\n\t\tyour system."
 			" Set to 0 to run forever.\n\n"
 			"\t-s\n\t--sleeptime <number> sleep-time for xsleep\n\n"
+			"\t-c\n\t--calctime <number> time the program should calculate"
+			" uninterrupted.\n\n"
 			"\t-p\n\t--period <number> period for sched_dead\n\n"
 			"\t-r\n\t--runtime <number> run-time for sched_dead\n\n"
-			"\t-d\n\t--deadline <number> deadline for sched_dead\n\n");
+			"\t-d\n\t--deadline <number> deadline for sched_dead\n\n"
+			"\t-z\n\t--set-cpu Try to set the cpu-affinity to core0."
+			"Typically not used when testing with CPU-Sets\n\n"
+			"\t-o\n\t--oak-iterations <number> NO. of iterations to oak"
+			" cpu iterations to fit configured calctime.\n\n");
+}
+
+
+void configure_cpu()
+{
+	const pid_t this_thread = 0;
+	cpu_set_t set;
+	CPU_ZERO(&set);
+	CPU_SET(0, &set);
+
+	if (sched_setaffinity(this_thread, sizeof(set), &set) == -1) {
+		perror("configure_cpu");
+		exit(EXIT_FAILURE);
+	}
+	puts("Successfully set to cpu 0.");
 }
 
 
@@ -114,6 +137,8 @@ void parse_args(struct config *cfg, int argc, char **argv)
 		CALCTIME,
 		DEADLINE,
 		PERIOD,
+		OAK_RUNS,
+		CPU,
 		HELP,
 	};
 
@@ -125,11 +150,13 @@ void parse_args(struct config *cfg, int argc, char **argv)
 	   {"calctime", required_argument, NULL, CALCTIME},
 	   {"deadline", required_argument, NULL, DEADLINE},
 	   {"period", required_argument, NULL, PERIOD},
+	   {"oak-iterations", required_argument, NULL, OAK_RUNS},
+	   {"set-cpu", no_argument, NULL, CPU},
 	   {"help", no_argument, NULL, HELP},
 	   {NULL, no_argument, NULL, 0}
 	};
 
-	while ((opt = getopt_long(argc, argv, "c:i:I:s:r:p:d:h",
+	while ((opt = getopt_long(argc, argv, "c:i:I:s:r:p:d:hzo:",
 				long_options, &option_index)) != -1) {
 		switch (opt) {
 		case CPU_ITERATIONS:
@@ -162,6 +189,14 @@ void parse_args(struct config *cfg, int argc, char **argv)
 		case 'p':
 			cfg->attr.sched_period = (__u64)(MS_TO_NS_FACTOR * atoi(optarg));
 			break;
+		case OAK_RUNS:
+		case 'o':
+			cfg->oak_runs = (unsigned)atoi(optarg);
+			break;
+		case CPU:
+		case 'z':
+			configure_cpu();
+			break;
 		case HELP:
 		case 'h':
 			print_help();
@@ -177,20 +212,6 @@ void parse_args(struct config *cfg, int argc, char **argv)
 }
 
 
-/* currently unused. setaffinity does not work with sched_dead */
-void configure_cpu()
-{
-	cpu_set_t set;
-	CPU_ZERO(&set);
-	CPU_SET(0, &set);
-	if (sched_setaffinity(0, sizeof(set), &set) == -1) {
-		perror("configure_cpu");
-		exit(EXIT_FAILURE);
-	}
-	puts("Successfully set to cpu 0.");
-}
-
-
 void init_sched_dead(struct config *cfg)
 {
 	int ret = sched_setattr(0, &(cfg->attr), 0);
@@ -203,7 +224,7 @@ void init_sched_dead(struct config *cfg)
 
 unsigned us_timediff(struct timeval tv_start, struct timeval tv_end)
 {
-	unsigned diff=0, sudiff=0;
+	unsigned diff = 0, sudiff = 0;
 	time_t start, end;
 	suseconds_t sustart, suend;
 	start = tv_start.tv_sec;
@@ -223,13 +244,13 @@ unsigned us_timediff(struct timeval tv_start, struct timeval tv_end)
 unsigned busy_cycles(unsigned long long iterations)
 {
 	struct timeval tv_start, tv_end;
+	static unsigned cycles = 0;
+	printf("Busy cycle: %u\n", cycles++);
 
 	gettimeofday(&tv_start, NULL);
-
-	puts("start decrementing.");
+	// printf("start iterating. Iterations: %llu\n", iterations);
 	while (iterations--);
-	puts("done decrementing.");
-
+	// puts("end iterating.");
 	gettimeofday(&tv_end, NULL);
 	return us_timediff(tv_start, tv_end);
 }
@@ -244,39 +265,36 @@ static inline bool five_perct_exact(unsigned now, unsigned goal)
 }
 
 
-/*
- * Calculates a number for the cpu to decrement so the time needed to reach 0
- * equals roughly the configured time calc_time_us.
- * This functions implements a PI regulator.
- */
 void oak_cpu(struct config *cfg)
 {
 	long long calctime_now = 0, calctime_goal = cfg->calc_time_us;
-	unsigned kp = 5;
 	unsigned long long averaging = 0;
-	int i;
-	long long reg = 0, integ = 0;
+	long long reg = 0, i;
 
 	puts("entering oak loop");
 	for (i = 0; i < OAKING_LOOPS; i++) {
-		calctime_now = 0, reg = 0, integ = 0;
+		calctime_now = 0, reg = 0;
+		reg = calctime_goal * 1000;
 
 		do {
-			reg = calctime_goal - calctime_now;
-			reg *= kp;
-			integ += reg;
-			printf("Iterations now: %lli\n", integ);
-			calctime_now = busy_cycles(integ);
-			printf("Calctime now: %llu, goal: %llu\n", calctime_now, calctime_goal);
-		} while (!five_perct_exact(calctime_now, calctime_goal));
-		printf("Calctime now: %llu, goal: %llu\n", calctime_now, calctime_goal);
+			calctime_now = busy_cycles(reg);
+			if (calctime_now > calctime_goal)
+				reg -= reg / 2;
+			else
+				reg += reg / 2;
 
-		averaging += integ;
+		} while (!five_perct_exact(calctime_now, calctime_goal));
+		/*
+		printf("Calctime now: %llu, goal: %llu\n",
+				calctime_now, calctime_goal);
+		*/
+
+		averaging += reg;
 	}
 
 	cfg->cpu_iterations = averaging / OAKING_LOOPS;
-	printf("Set CPU-iterations to %llu.\n", cfg->cpu_iterations);
-	puts("Leaving oak.");
+	//printf("Set CPU-iterations to %llu.\n", cfg->cpu_iterations);
+	puts("Done oaking.");
 }
 
 
@@ -287,9 +305,7 @@ void xsleep(struct config *cfg)
 
 	struct timeval tv_start, tv_end;
 	gettimeofday(&tv_start, NULL);
-
 	usleep(cfg->sleeptime_ms * MS_TO_US_FACTOR);
-
 	gettimeofday(&tv_end, NULL);
 
 	printf("%u us sleep time\n", us_timediff(tv_start, tv_end));
@@ -315,10 +331,11 @@ int main(int argc, char *argv[])
 
 	struct config cfg = {
 		.attr = attr,
-		.cpu_iterations = 1 * 1000 * 1000,
+		.cpu_iterations = 1 * 1000,
 		.program_iterations = 1,
-		.sleeptime_ms = DEFAULT_SLEEPTIME,
-		.calc_time_us = DEFAULT_CALCTIME * MS_TO_US_FACTOR,
+		.oak_runs = 1,
+		.sleeptime_ms = DEFAULT_SLEEPTIME_MS,
+		.calc_time_us = DEFAULT_CALCTIME_MS * MS_TO_US_FACTOR,
 	};
 
 	parse_args(&cfg, argc, argv);

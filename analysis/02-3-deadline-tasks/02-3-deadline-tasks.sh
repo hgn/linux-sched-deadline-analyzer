@@ -7,18 +7,18 @@ cd $(dirname $0)
 sh ../configure-cpu-set.sh
 
 
-perf sched record ../../src/runner -I 0 --period 2000 --runtime 150 --deadline 500 --calctime 100 --sleeptime 2000 & 
+perf sched record ../../src/runner -I 0 --period 2000 --runtime 150 --deadline 500 --calctime 100 --sleeptime 1900 &
 PID1=$!
 echo $PID1
 
-../../src/runner -I 0 --period 2000 --runtime 150 --deadline 500 --calctime 100 --sleeptime 2000 & 
+../../src/runner -I 0 --period 2000 --runtime 150 --deadline 500 --calctime 100 --sleeptime 1900 &
 PID2=$!
 
-../../src/runner -I 0 --period 2000 --runtime 150 --deadline 500 --calctime 100 --sleeptime 2000 & 
+../../src/runner -I 0 --period 2000 --runtime 150 --deadline 500 --calctime 100 --sleeptime 1900 &
 PID3=$!
 
-# sched other
-../../src/runner -I 0 --cpu-iterations 1000000000000 --sleeptime 0 & 
+# sched other. With this config it will attempt to calculate forever
+../../src/runner -I 0 --cpu-iterations 1000000000000 --sleeptime 0 &
 PID4=$!
 
 
