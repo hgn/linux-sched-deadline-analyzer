@@ -4,36 +4,38 @@
 # 3 deadline scheduler processes and a busy SCHED_OTHER
 # process
 cd $(dirname $0)
-sh ../configure-super-exclusive-cpu-set.sh
+sh ./configure-cpu-set.sh
+echo $$ > /dev/cpuset/cpu0/tasks
 
-perf sched record ../../src/runner -I 0 --period 2000 --runtime 150 --deadline 500 --calctime 100 --sleeptime 1900 &
+../../src/runner -I 0 -o 1 --period 2000 --runtime 100 --deadline 900 --calctime 100 --sleeptime 1900 &
 PID1=$!
-echo $PID1
 
-../../src/runner -I 0 --period 2000 --runtime 150 --deadline 500 --calctime 100 --sleeptime 1900 &
+../../src/runner -I 0 -o 1 --period 2000 --runtime 150 --deadline 500 --calctime 100 --sleeptime 1900 &
 PID2=$!
 
-../../src/runner -I 0 --period 2000 --runtime 150 --deadline 500 --calctime 100 --sleeptime 1900 &
+../../src/runner -I 0 -o 1 --period 2000 --runtime 150 --deadline 500 --calctime 100 --sleeptime 1900 &
 PID3=$!
+echo $PID3 > ./deadlinerunner.pid
 
-# sched other. With this config it will attempt to calculate forever
-../../src/runner -I 0 --cpu-iterations 10000000000 --sleeptime 0 &
+../../src/runner -I 0 -o 1 --cpu-iterations 10000000000 --sleeptime 0 &
 PID4=$!
 
-# execute test for N seconds
-sleep 60
-
 EVENTS='sched:sched_switch,sched:sched_wakeup'
-perf record -C 3 -e $EVENTS &
+perf record -C 0 -e $EVENTS &
 PID5=$!
 
+# execute test for N seconds
+sleep 30
+
 # kill everything
-kill -9 $PID1
-kill -9 $PID2
-kill -9 $PID3
-kill -9 $PID4
-kill -9 $PID5
+kill -15 $PID1
+kill -15 $PID2
+kill -15 $PID3
+kill -15 $PID4
+sleep 1
+kill -15 $PID5
 
 mkdir results
 sleep 2
-echo $(PID4) > ./deadlinerunner.pid
+perf script > ./results/results.txt
+python3 timeparser.py

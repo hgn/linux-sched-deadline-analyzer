@@ -78,13 +78,17 @@ def main():
     f = open("./results/results.txt")
     pid = 0
     with open("./deadlinerunner.pid", "r") as pidfile:
-        pid = str(pidfile.readline())
+        pid = str(pidfile.readline()).rstrip('\n')
+
+    pid = " " + pid + " "
+    print(pid)
 
     switch_in  = []
     switch_out = []
 
     for line in f:
         if pid in line:
+            print(line)
             line_parser(line, switch_in, switch_out)
     f.close()
 
