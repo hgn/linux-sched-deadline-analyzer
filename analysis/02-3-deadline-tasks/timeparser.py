@@ -10,8 +10,9 @@ def grep_time(line):
     return i
 
 
-def switches_from_runner(line):
-    match = re.search(r'=runner.*?==>', line)
+def switches_from_runner(line, pid):
+    r = r'prev_pid=' + pid
+    match = re.search(r, line)
 
     if match is None:
         return False
@@ -19,8 +20,9 @@ def switches_from_runner(line):
         return True
 
 
-def switches_to_runner(line):
-    match = re.search(r'==>.*?runner', line)
+def switches_to_runner(line, pid):
+    r = r'next_pid=' + pid
+    match = re.search(r, line)
 
     if match is None:
         return False
@@ -28,13 +30,13 @@ def switches_to_runner(line):
         return True
 
 
-def line_parser(line, switch_in, switch_out):
+def line_parser(line, pid, switch_in, switch_out):
     global first_time
 
     if "sched_switch" in line:
-        if switches_to_runner(line):
+        if switches_to_runner(line, pid):
             switch_in.append(grep_time(line))
-        elif switches_from_runner(line):
+        elif switches_from_runner(line, pid):
             switch_out.append(grep_time(line))
 
         # Make sure the first match is a switch_in
@@ -80,17 +82,12 @@ def main():
     with open("./deadlinerunner.pid", "r") as pidfile:
         pid = str(pidfile.readline()).rstrip('\n')
 
-    pid_alone = " " + pid + " "
-    pid_from_other_proc = "pid=" + pid
-    print(pid)
-
     switch_in  = []
     switch_out = []
 
     for line in f:
-        if pid_alone in line or pid_from_other_proc in line:
-            print(line)
-            line_parser(line, switch_in, switch_out)
+        if "runner" in line:
+            line_parser(line, pid, switch_in, switch_out)
     f.close()
 
     storer(switch_in, switch_out)

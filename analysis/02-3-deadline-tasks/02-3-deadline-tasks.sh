@@ -7,17 +7,17 @@ cd $(dirname $0)
 sh ./configure-cpu-set.sh
 echo $$ > /dev/cpuset/cpu0/tasks
 
-../../src/runner -I 0 -o 1 --period 2000 --runtime 100 --deadline 900 --calctime 100 --sleeptime 1900 &
+../../src/runner -I 0 -o 10 --period 1000 --runtime 100 --deadline 900 --calctime 100 --sleeptime 1900 &
 PID1=$!
 
-../../src/runner -I 0 -o 1 --period 2000 --runtime 150 --deadline 500 --calctime 100 --sleeptime 1900 &
+../../src/runner -I 0 -o 10 --period 1000 --runtime 150 --deadline 500 --calctime 100 --sleeptime 1900 &
 PID2=$!
 
-../../src/runner -I 0 -o 1 --period 2000 --runtime 150 --deadline 500 --calctime 100 --sleeptime 1900 &
+../../src/runner -I 0 -o 10 --period 2000 --runtime 1000 --deadline 100 --calctime 1000 --sleeptime 1100 &
 PID3=$!
 echo $PID3 > ./deadlinerunner.pid
 
-../../src/runner -I 0 -o 1 --cpu-iterations 10000000000 --sleeptime 0 &
+../../src/runner -I 0 -o 10 --cpu-iterations 10000000000 --sleeptime 0 &
 PID4=$!
 
 EVENTS='sched:sched_switch,sched:sched_wakeup'
