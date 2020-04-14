@@ -80,14 +80,15 @@ def main():
     with open("./deadlinerunner.pid", "r") as pidfile:
         pid = str(pidfile.readline()).rstrip('\n')
 
-    pid = " " + pid + " "
+    pid_alone = " " + pid + " "
+    pid_from_other_proc = "pid=" + pid
     print(pid)
 
     switch_in  = []
     switch_out = []
 
     for line in f:
-        if pid in line:
+        if pid_alone in line or pid_from_other_proc in line:
             print(line)
             line_parser(line, switch_in, switch_out)
     f.close()

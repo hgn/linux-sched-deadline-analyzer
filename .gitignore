@@ -1,4 +1,7 @@
 src/runner
+*.pid
+*.log
+analysis/*/results/*
 
 # perf data
 perf.data
