@@ -272,7 +272,7 @@ void oak_cpu(struct config *cfg)
 	long long reg = 0, i;
 
 	puts("entering oak loop");
-	for (i = 0; i < OAKING_LOOPS; i++) {
+	for (i = 0; i < cfg->oak_runs; i++) {
 		calctime_now = 0, reg = 0;
 		reg = calctime_goal * 1000;
 
