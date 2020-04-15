@@ -1,6 +1,9 @@
 all:
 	make -C src
 
+debug:
+	make debug -C src
+
 analyze: all
 	make -C analysis/01-one-sched-other-one-second/
 
