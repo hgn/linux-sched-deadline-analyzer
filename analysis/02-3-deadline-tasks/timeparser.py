@@ -1,5 +1,6 @@
 import re
 import csv
+import sys
 
 first_time = True
 
@@ -79,8 +80,10 @@ def storer(switch_in, switch_out):
 def main():
     f = open("./results/results.txt")
     pid = 0
-    with open("./deadlinerunner.pid", "r") as pidfile:
-        pid = str(pidfile.readline()).rstrip('\n')
+    
+    pidfile = sys.argv[1]
+    with open(pidfile, "r") as p:
+        pid = str(p.readline()).rstrip('\n')
 
     switch_in  = []
     switch_out = []
