@@ -315,8 +315,9 @@ void xsleep(struct config *cfg)
 
 int main(int argc, char *argv[])
 {
-	unsigned i;
+	unsigned i, calculated;
 	bool run = true;
+	(void)calculated;
 
 	struct sched_attr attr = {
 		.size = sizeof(struct sched_attr),
@@ -351,8 +352,9 @@ int main(int argc, char *argv[])
 	}
 
 	for (i = 0; run; i++) {
+		calculated = busy_cycles(cfg.cpu_iterations);
 #ifdef DEBUG
-		printf("Calculated for %u us.\n", busy_cycles(cfg.cpu_iterations));
+		printf("Calculated for %u us.\n", calculated);
 #endif
 		xsleep(&cfg);
 
